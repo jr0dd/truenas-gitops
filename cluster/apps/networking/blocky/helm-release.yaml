@@ -1,0 +1,96 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: blocky
+  namespace: networking
+spec:
+  interval: 5m
+  chart:
+    spec:
+      # renovate: registryUrl=https://k8s-at-home.com/charts/
+      chart: blocky
+      version: 9.0.3
+      sourceRef:
+        kind: HelmRepository
+        name: k8s-at-home-charts
+        namespace: flux-system
+      interval: 5m
+  values:
+    image:
+      repository: ghcr.io/0xerr0r/blocky
+      tag: v0.16
+    controller:
+      enabled: true
+      replicas: 1
+      strategy: RollingUpdate
+    env:
+      TZ: "America/New_York"
+    service:
+      main:
+        enabled: true
+        type: LoadBalancer
+        loadBalancerIP: "${LB_BLOCKY_IP}"
+        externalTrafficPolicy: Local
+        annotations:
+          metallb.universe.tf/allow-shared-ip: blocky
+        ports:
+          http:
+            enabled: true
+            port: 4000
+            protocol: HTTP
+      dns:
+        enabled: true
+        type: LoadBalancer
+        loadBalancerIP: "${LB_BLOCKY_IP}"
+        externalTrafficPolicy: Local
+        annotations:
+          metallb.universe.tf/allow-shared-ip: blocky
+        ports:
+          tcp:
+            enabled: true
+            port: 53
+            protocol: TCP
+            targetPort: 53
+          udp:
+            enabled: true
+            port: 53
+            protocol: UDP
+            targetPort: 53
+    metrics:
+      enabled: true
+      prometheusRule:
+        enabled: true
+    podAnnotations:
+      configmap.reloader.stakater.com/reload: "blocky-config"
+    config: |
+      httpPort: 4000
+      logLevel: info
+      upstream:
+        default:
+        - tcp-tls://1.1.1.1
+        - tcp-tls://9.9.9.9
+        - tcp-tls://1.0.0.1
+      conditional:
+        mapping:
+          ${SECRET_DOMAIN}: udp:${LB_K8S_GATEWAY_IP}
+      clientLookup:
+        upstream: udp:${GATEWAY_IP}
+      blocking:
+        blackLists:
+          ads:
+          - https://raw.githubusercontent.com/ookangzheng/dbl-oisd-nl/master/dbl.txt
+          # https://dbl.oisd.nl
+          fakenews:
+          - https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews/hosts
+        whiteLists:
+          ads:
+          - https://raw.githubusercontent.com/anudeepND/whitelist/master/domains/whitelist.txt
+        clientGroupsBlock:
+          default:
+          - ads
+          - fakenews
+        blockType: zeroIp
+      prometheus:
+        enable: true
+        path: /metrics

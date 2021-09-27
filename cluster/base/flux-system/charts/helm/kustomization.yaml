@@ -1,0 +1,20 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - authentik-charts.yaml
+  - bitnami-charts.yaml
+  - external-dns-charts.yaml
+  - grafana-charts.yaml
+  - hajimari-charts.yaml
+  - jetstack-charts.yaml
+  - jr0dd-charts.yaml
+  - k8s-at-home-charts.yaml
+  - k8s-gateway-charts.yaml
+  - metallb-charts.yaml
+  - minio-charts.yaml
+  - openebs-zfs-localpv-charts.yaml
+  - prometheus-community-charts.yaml
+  - stakater-charts.yaml
+  - traefik-charts.yaml
+  - vmware-tanzu-charts.yaml

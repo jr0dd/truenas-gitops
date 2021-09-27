@@ -1,0 +1,114 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: plex
+  namespace: media
+spec:
+  interval: 5m
+  chart:
+    spec:
+      # renovate: registryUrl=https://k8s-at-home.com/charts/
+      chart: plex
+      version: 6.0.2
+      sourceRef:
+        kind: HelmRepository
+        name: k8s-at-home-charts
+        namespace: flux-system
+      interval: 5m
+  values:
+    image:
+      repository: ghcr.io/k8s-at-home/plex
+      tag: v1.24.3.5033-757abe6b4
+    controller:
+      enabled: true
+      replicas: 1
+      strategy: RollingUpdate
+    env:
+      TZ: "America/New_York"
+    service:
+      main:
+        enabled: true
+        type: LoadBalancer
+        loadBalancerIP: "${LB_PLEX_IP}"
+        externalTrafficPolicy: Local
+        annotations:
+          metallb.universe.tf/allow-shared-ip: plex
+          traefik.ingress.kubernetes.io/service.serversscheme: https
+        ports:
+          http:
+            enabled: true
+            port: 32400
+            protocol: HTTP
+      roku:
+        enabled: true
+        type: LoadBalancer
+        loadBalancerIP: "${LB_PLEX_IP}"
+        externalTrafficPolicy: Local
+        annotations:
+          metallb.universe.tf/allow-shared-ip: plex
+        ports:
+          roku:
+            enabled: true
+            port: 8324
+            protocol: TCP
+            targetPort: 8324
+      gdm:
+        enabled: true
+        type: LoadBalancer
+        loadBalancerIP: "${LB_PLEX_IP}"
+        externalTrafficPolicy: Local
+        annotations:
+          metallb.universe.tf/allow-shared-ip: plex
+        ports:
+          gdm1:
+            enabled: true
+            port: 32410
+            protocol: UDP
+            targetPort: 32410
+          gdm2:
+            enabled: true
+            port: 32412
+            protocol: UDP
+            targetPort: 32412
+          gdm3:
+            enabled: true
+            port: 32413
+            protocol: UDP
+            targetPort: 32413
+          gdm4:
+            enabled: true
+            port: 32414
+            protocol: UDP
+            targetPort: 32414
+    persistence:
+      config:
+        enabled: true
+        existingClaim: plex-config-v1
+      media:
+        enabled: true
+        type: pvc
+        existingClaim: media
+        mountPath: /media
+      transcode:
+        enabled: true
+        type: emptyDir
+        medium: Memory
+    addons:
+      promtail:
+        enabled: true
+        image:
+          repository: grafana/promtail
+          tag: 2.3.0
+        loki: http://loki.monitoring:3100/loki/api/v1/push
+        logs:
+          - name: promtail/plex
+            path: "/config/Library/Application Support/Plex Media Server/Logs/*.log"
+          - name: promtail/plex/plugins
+            path: "/config/Library/Application Support/Plex Media Server/Logs/PMS Plugin Logs/*.log"
+        volumeMounts:
+          - name: config
+            mountPath: /config
+            readOnly: true
+        securityContext:
+          runAsUser: 0
